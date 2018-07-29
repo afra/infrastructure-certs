@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# MIT
+# 2018 Alexander Couzens <lynxis@fe80.eu>
+
+create_certs() {
+	local certchains="$1"
+	local servers="$2"
+	local clients="$3"
+
+	for chain in $certchains ; do
+		if [ ! -d "$chain" ] ; then
+			echo "Certificate chain not found in $PWD/$chain !"
+			exit 1
+		fi
+		cd "$chain" || exit 1
+
+		# create CA if not already happened
+		if [ ! -e ./pki/ca.crt ];then
+			# remove old certs
+			echo -e "yes" | ./easyrsa init-pki
+			yes "" | ./easyrsa build-ca nopass
+		fi
+
+		for srv in $servers ; do
+			if [ -e "./pki/private/$srv.key" ] ; then
+				continue
+			fi
+			./easyrsa build-server-full "$srv" nopass
+			cat "./pki/private/$srv.key" "./pki/issued/$srv.crt" > "./pki/$srv.pem"
+		done
+
+		for client in $clients ; do
+			if [ -e "./pki/private/$client.key" ] ; then
+				continue
+			fi
+			./easyrsa build-client-full "$client" nopass
+			cat "./pki/private/$client.key" "./pki/issued/$client.crt" > "./pki/$client.pem"
+		done
+
+		cd ..
+	done
+}
+
+#             name        server certs  client certs
+create_certs "afra-vpn" "afra.fe80.eu" "afra-modem.afra-berlin.de"
